@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>硫化锌晶胞结构</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, crystal;
+        let touchStartX = 0, touchStartY = 0;
+        let rotationY = 0, rotationX = 0;
+        const rotateSpeed = 0.004;
+        const latticeConstant = 2.0;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.z = 9;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // 专业级三点布光
+            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+            const directional1 = new THREE.DirectionalLight(0xffffff, 0.6);
+            directional1.position.set(2, 2, 3);
+            const directional2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            directional2.position.set(-2, -1, 2);
+            scene.add(ambient, directional1, directional2);
+
+            createStructure();
+            setupEventListeners();
+        }
+
+        function createStructure() {
+            crystal = new THREE.Group();
+
+            // 锌离子坐标（顶点+面心）
+            const znPositions = [
+                // 立方体顶点
+                [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
+                // 面心位置
+                [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5],
+                [0.5, 0.5, 1], [0.5, 1, 0.5], [1, 0.5, 0.5]
+            ];
+
+            // 硫离子坐标（四角交替分布）
+            const sPositions = [
+                [0.25, 0.25, 0.25], // 第一层左下前
+                [0.75, 0.75, 0.25], // 第一层右上后
+                [0.75, 0.25, 0.75], // 第二层右下前
+                [0.25, 0.75, 0.75]  // 第二层左上后
+            ];
+
+            // 创建锌离子（金属质感）
+            znPositions.forEach(pos => {
+                const sphere = createAtom(
+                    pos,
+                    0.18,
+                    new THREE.MeshPhongMaterial({
+                        color: 0xA9A9A9,
+                        shininess: 120,
+                        specular: 0x444444
+                    })
+                );
+                crystal.add(sphere);
+            });
+
+            // 创建硫离子（半透明高亮）
+            sPositions.forEach(pos => {
+                const sphere = createAtom(
+                    pos,
+                    0.22,
+                    new THREE.MeshPhongMaterial({
+                        color: 0xFFEA00,
+                        transparent: true,
+                        opacity: 0.9,
+                        specular: 0x555555
+                    })
+                );
+                crystal.add(sphere);
+            });
+
+            // 晶格框架（深色加强立体感）
+            const boxGeo = new THREE.BoxGeometry(latticeConstant, latticeConstant, latticeConstant);
+            const edges = new THREE.EdgesGeometry(boxGeo);
+            const frame = new THREE.LineSegments(
+                edges,
+                new THREE.LineBasicMaterial({ 
+                    color: 0x2F4F4F,
+                    linewidth: 2 
+                })
+            );
+            crystal.add(frame);
+
+            crystal.position.set(0, 0, 0);
+            scene.add(crystal);
+        }
+
+        function createAtom([x, y, z], radius, material) {
+            const geometry = new THREE.SphereGeometry(radius, 32, 32);
+            const sphere = new THREE.Mesh(geometry, material);
+            const convert = (v) => (v * latticeConstant) - latticeConstant/2;
+            sphere.position.set(convert(x), convert(y), convert(z));
+            return sphere;
+        }
+
+        function setupEventListeners() {
+            // 触摸事件处理
+            document.addEventListener('touchstart', e => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+
+            document.addEventListener('touchmove', e => {
+                e.preventDefault();
+                const deltaX = e.touches[0].clientX - touchStartX;
+                const deltaY = e.touches[0].clientY - touchStartY;
+
+                rotationY += deltaX * rotateSpeed;
+                rotationX += deltaY * rotateSpeed;
+
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+
+            // 窗口自适应
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            crystal.rotation.y = rotationY;
+            crystal.rotation.x = rotationX;
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
